@@ -1,107 +1,191 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Lugares Turísticos de El Salvador</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    #controls {
-      padding: 10px;
-      background: #f4f4f4;
-    }
-    #map {
-      height: 400px;
-      width: 100%;
-    }
-    #places {
-      padding: 20px;
-    }
-    .place {
-      margin-bottom: 10px;
-    }
-    select {
-      padding: 5px;
-      font-size: 16px;
-    }
-  </style>
+    <title>Explorador Turísticos Inteligente El Salvador</title>
+    <style>
+        #categorias {
+            margin-bottom: 20px;
+        }
+        .categoria-btn {
+            margin: 5px;
+            padding: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .categoria-btn:hover {
+            background-color: #0056b3;
+        }
+        #resultados {
+            
+            
+            justify-content: center;
+            width: 50%;
+            margin-top: 20px;
+            font-family: sans-serif;
+        }
+        .lugar {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        /* Estilos para el modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 50%;
+            text-align: center;
+        }
+        .close {
+            color: red;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #modal-map {
+            width: 100%;
+            height: 300px;
+            margin-top: 15px;
+        }
+    </style>
+    <script src="config.js"></script>
+
 </head>
 <body>
-  <div id="controls">
-    <label for="category">Selecciona una categoría:</label>
-    <select id="category">
-      <option value="beach">Playas</option>
-      <option value="lodging">Hoteles</option>
-      <option value="tourist_attraction">Centros Turísticos</option>
-      <option value="natural_feature">Ríos</option>
-      <option value="mountain">Montañas</option>
-    </select>
-    <button onclick="searchPlaces()">Buscar</button>
-  </div>
+    <h1>Top 10 Lugares Turísticos en El Salvador</h1>
+    
+    <div id="categorias">
+        <button class="categoria-btn" onclick="buscarLugaresPorCategoria('playa')">Playas</button>
+        <button class="categoria-btn" onclick="buscarLugaresPorCategoria('sitio arqueológico')">Sitios Arqueológicos</button>
+        <button class="categoria-btn" onclick="buscarLugaresPorCategoria('hotel de montaña')">Hoteles de Montaña</button>
+        <button class="categoria-btn" onclick="buscarLugaresPorCategoria('rio')">Rios</button>
+        <button class="categoria-btn" onclick="buscarLugaresPorCategoria('bosque')">Bosques</button>
+    </div>
 
-  <div id="map"></div>
-  <div id="places"></div>
+    <div id="resultados">Selecciona una categoría para visualizar los mejores lugares.</div>
 
-  <script>
-    let map;
-    let service;
+    <!-- Modal para mostrar información -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModal()">&times;</span>
+            <h3 id="modal-title"></h3>
+            <p id="modal-address"></p>
+            <p id="modal-rating"></p>
+            <img id="modal-image" src="" alt="Foto del lugar" style="max-width: 100%;">
+            <div id="modal-map"></div>
+        </div>
+    </div>
 
-    const elSalvadorCenter = { lat: 13.7942, lng: -88.8965 };
+    <script>
+        let map;
+        let service;
+        const apiKey = config.apiKey;//Llamada a Key
+        const language = 'es';
 
-    function initMap() {
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: elSalvadorCenter,
-        zoom: 8,
-      });
-    }
-
-    function searchPlaces() {
-      const type = document.getElementById("category").value;
-
-      const request = {
-        location: elSalvadorCenter,
-        radius: '50000',
-        type: type,
-        rankBy: google.maps.places.RankBy.PROMINENCE
-      };
-
-      service = new google.maps.places.PlacesService(map);
-      service.nearbySearch(request, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK) {
-          displayPlaces(results.slice(0, 10));
+        async function initMap() {
+            map = new google.maps.Map(document.createElement('div'), { 
+                center: {lat: 13.7942, lng: -88.8965}, 
+                zoom: 8
+            });
+            service = new google.maps.places.PlacesService(map);
         }
-      });
-    }
 
-    function displayPlaces(places) {
-      const container = document.getElementById("places");
-      container.innerHTML = "";
+        async function buscarLugaresPorCategoria(categoria) {
+            document.getElementById('resultados').innerText = `Buscando ${categoria}s en El Salvador...`;
 
-      places.forEach((place, i) => {
-        const placeDiv = document.createElement("div");
-        placeDiv.classList.add("place");
-        placeDiv.innerHTML = `
-          <strong>${i + 1}. ${place.name}</strong><br>
-          Calificación: ${place.rating || 'N/A'}<br>
-          Dirección: ${place.vicinity || 'No disponible'}<br><br>
-        `;
+            try {
+                const response = await buscarLugaresConPalabraClave(categoria);
+                mostrarTop10(response.slice(0, 10));
+            } catch (error) {
+                console.error(error);
+                document.getElementById('resultados').innerText = 'Error al buscar lugares.';
+            }
+        }
 
-        container.appendChild(placeDiv);
+        async function buscarLugaresConPalabraClave(keyword) {
+            return new Promise((resolve, reject) => {
+                const request = {
+                    query: `${keyword} en El Salvador`,
+                    location: new google.maps.LatLng(13.7942, -88.8965),
+                    radius: 50000,
+                    language: language
+                };
 
-        new google.maps.Marker({
-          map,
-          position: place.geometry.location,
-          title: place.name,
-        });
-      });
-    }
-  </script>
+                service.textSearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results);
+                    } else {
+                        reject(new Error(`Error en la búsqueda de lugares (${keyword}): ${status}`));
+                    }
+                });
+            });
+        }
 
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD3oI72JDQD-K0K_G-0Pdo0w5fT5rnmfgU&libraries=places&callback=initMap">
-  </script>
+        function mostrarTop10(topLugares) {
+            const resultadosDiv = document.getElementById('resultados');
+            resultadosDiv.innerHTML = '<h2>Resultados</h2>';
+            
+            topLugares.forEach((lugar, index) => {
+                const lugarDiv = document.createElement('div');
+                lugarDiv.classList.add('lugar');
+                lugarDiv.innerHTML = `<h3>${index + 1}. ${lugar.name}</h3>`;
+                lugarDiv.addEventListener('click', () => abrirModal(lugar));
+                resultadosDiv.appendChild(lugarDiv);
+            });
+        }
+
+        function abrirModal(lugar) {
+            document.getElementById('modal-title').innerText = lugar.name;
+            document.getElementById('modal-address').innerText = `Dirección: ${lugar.formatted_address || 'No disponible'}`;
+            document.getElementById('modal-rating').innerText = `Calificación: ${lugar.rating || 'No disponible'} (${lugar.user_ratings_total || 'No disponible'} reseñas)`;
+            document.getElementById('modal-image').src = lugar.photos && lugar.photos.length > 0
+                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${lugar.photos[0].photo_reference}&key=${apiKey}`
+                : '';
+
+            document.getElementById('modal').style.display = "block";
+
+            // Inicializar el mapa en el modal
+            const modalMap = new google.maps.Map(document.getElementById('modal-map'), {
+                center: { lat: lugar.geometry.location.lat(), lng: lugar.geometry.location.lng() },
+                zoom: 15
+            });
+
+            new google.maps.Marker({
+                position: { lat: lugar.geometry.location.lat(), lng: lugar.geometry.location.lng() },
+                map: modalMap,
+                title: lugar.name
+            });
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal').style.display = "none";
+        }
+
+        function loadGoogleMapsAPI() {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap&language=${language}`;
+            script.async = true;
+            document.head.appendChild(script);
+        }
+
+        loadGoogleMapsAPI();
+    </script>
 </body>
 </html>
